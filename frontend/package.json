@@ -13,9 +13,8 @@
     "axios": "^1.4.0",
     "chart.js": "^3.9.1",
     "react-chartjs-2": "^4.3.1",
+    "chartjs-adapter-date-fns": "^2.0.0",
     "date-fns": "^2.29.3",
-    "react-datepicker": "^4.8.0",
-    "react-hook-form": "^7.34.0",
     "web-vitals": "^2.1.4"
   },
   "scripts": {

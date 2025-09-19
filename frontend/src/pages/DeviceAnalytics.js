@@ -10,13 +10,13 @@ import {
   Title,
   Tooltip,
   Legend,
+  TimeScale,
 } from 'chart.js';
-import DatePicker from 'react-datepicker';
-import "react-datepicker/dist/react-datepicker.css";
+import 'chartjs-adapter-date-fns';
 import { devicesAPI, heartbeatAPI } from '../services/api';
 import Navbar from '../components/Navbar';
-import { format } from 'date-fns';
 
+// Registrar todas as escalas necessárias incluindo TimeScale
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -24,7 +24,8 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  TimeScale
 );
 
 const DeviceAnalytics = () => {
@@ -99,16 +100,18 @@ const DeviceAnalytics = () => {
       
       datasets.push({
         label: device?.name || 'Unknown Device',
-        data: data.map(h => ({ x: h.created_at, y: h[metric] })),
+        data: data.map(h => ({ 
+          x: new Date(h.created_at).getTime(), 
+          y: h[metric] 
+        })),
         borderColor: colors[index % colors.length],
         backgroundColor: colors[index % colors.length] + '20',
         tension: 0.1,
+        fill: false
       });
     });
 
-    return {
-      datasets,
-    };
+    return { datasets };
   };
 
   const chartOptions = {
@@ -123,12 +126,39 @@ const DeviceAnalytics = () => {
         type: 'time',
         time: {
           unit: 'hour',
+          displayFormats: {
+            hour: 'MMM dd, HH:mm'
+          }
         },
+        title: {
+          display: true,
+          text: 'Time'
+        }
       },
       y: {
         beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Value'
+        }
       },
     },
+    interaction: {
+      intersect: false,
+      mode: 'index'
+    }
+  };
+
+  const formatDate = (date) => {
+    return date.toISOString().split('T')[0];
+  };
+
+  const handleStartDateChange = (e) => {
+    setStartDate(new Date(e.target.value));
+  };
+
+  const handleEndDateChange = (e) => {
+    setEndDate(new Date(e.target.value));
   };
 
   return (
@@ -164,15 +194,23 @@ const DeviceAnalytics = () => {
               }}>
                 Select Devices
               </label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', maxWidth: '400px' }}>
                 {devices.map(device => (
-                  <label key={device.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <label key={device.id} style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.25rem',
+                    padding: '0.25rem 0.5rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    backgroundColor: selectedDevices.includes(device.id) ? '#eff6ff' : 'white'
+                  }}>
                     <input
                       type="checkbox"
                       checked={selectedDevices.includes(device.id)}
                       onChange={() => handleDeviceToggle(device.id)}
                     />
-                    {device.name}
+                    <span style={{ fontSize: '0.875rem' }}>{device.name}</span>
                   </label>
                 ))}
               </div>
@@ -189,12 +227,10 @@ const DeviceAnalytics = () => {
               }}>
                 Start Date
               </label>
-              <DatePicker
-                selected={startDate}
-                onChange={setStartDate}
-                selectsStart
-                startDate={startDate}
-                endDate={endDate}
+              <input
+                type="date"
+                value={formatDate(startDate)}
+                onChange={handleStartDateChange}
                 style={{
                   padding: '0.5rem',
                   border: '1px solid #d1d5db',
@@ -213,13 +249,11 @@ const DeviceAnalytics = () => {
               }}>
                 End Date
               </label>
-              <DatePicker
-                selected={endDate}
-                onChange={setEndDate}
-                selectsEnd
-                startDate={startDate}
-                endDate={endDate}
-                minDate={startDate}
+              <input
+                type="date"
+                value={formatDate(endDate)}
+                onChange={handleEndDateChange}
+                min={formatDate(startDate)}
                 style={{
                   padding: '0.5rem',
                   border: '1px solid #d1d5db',
@@ -242,7 +276,20 @@ const DeviceAnalytics = () => {
               <h3 style={{ marginBottom: '1rem', fontSize: '1.25rem', fontWeight: 'bold' }}>
                 CPU Usage (%)
               </h3>
-              <Line data={getChartData('cpu_usage')} options={chartOptions} />
+              <div style={{ height: '400px' }}>
+                <Line data={getChartData('cpu_usage')} options={{
+                  ...chartOptions,
+                  maintainAspectRatio: false,
+                  scales: {
+                    ...chartOptions.scales,
+                    y: {
+                      ...chartOptions.scales.y,
+                      max: 100,
+                      title: { display: true, text: 'CPU Usage (%)' }
+                    }
+                  }
+                }} />
+              </div>
             </div>
 
             <div style={{
@@ -254,7 +301,20 @@ const DeviceAnalytics = () => {
               <h3 style={{ marginBottom: '1rem', fontSize: '1.25rem', fontWeight: 'bold' }}>
                 RAM Usage (%)
               </h3>
-              <Line data={getChartData('ram_usage')} options={chartOptions} />
+              <div style={{ height: '400px' }}>
+                <Line data={getChartData('ram_usage')} options={{
+                  ...chartOptions,
+                  maintainAspectRatio: false,
+                  scales: {
+                    ...chartOptions.scales,
+                    y: {
+                      ...chartOptions.scales.y,
+                      max: 100,
+                      title: { display: true, text: 'RAM Usage (%)' }
+                    }
+                  }
+                }} />
+              </div>
             </div>
 
             <div style={{
@@ -266,7 +326,19 @@ const DeviceAnalytics = () => {
               <h3 style={{ marginBottom: '1rem', fontSize: '1.25rem', fontWeight: 'bold' }}>
                 Temperature (°C)
               </h3>
-              <Line data={getChartData('temperature')} options={chartOptions} />
+              <div style={{ height: '400px' }}>
+                <Line data={getChartData('temperature')} options={{
+                  ...chartOptions,
+                  maintainAspectRatio: false,
+                  scales: {
+                    ...chartOptions.scales,
+                    y: {
+                      ...chartOptions.scales.y,
+                      title: { display: true, text: 'Temperature (°C)' }
+                    }
+                  }
+                }} />
+              </div>
             </div>
 
             <div style={{
@@ -278,7 +350,20 @@ const DeviceAnalytics = () => {
               <h3 style={{ marginBottom: '1rem', fontSize: '1.25rem', fontWeight: 'bold' }}>
                 Disk Free Space (%)
               </h3>
-              <Line data={getChartData('disk_free')} options={chartOptions} />
+              <div style={{ height: '400px' }}>
+                <Line data={getChartData('disk_free')} options={{
+                  ...chartOptions,
+                  maintainAspectRatio: false,
+                  scales: {
+                    ...chartOptions.scales,
+                    y: {
+                      ...chartOptions.scales.y,
+                      max: 100,
+                      title: { display: true, text: 'Disk Free Space (%)' }
+                    }
+                  }
+                }} />
+              </div>
             </div>
 
             <div style={{
@@ -290,12 +375,33 @@ const DeviceAnalytics = () => {
               <h3 style={{ marginBottom: '1rem', fontSize: '1.25rem', fontWeight: 'bold' }}>
                 DNS Latency (ms)
               </h3>
-              <Line data={getChartData('dns_latency')} options={chartOptions} />
+              <div style={{ height: '400px' }}>
+                <Line data={getChartData('dns_latency')} options={{
+                  ...chartOptions,
+                  maintainAspectRatio: false,
+                  scales: {
+                    ...chartOptions.scales,
+                    y: {
+                      ...chartOptions.scales.y,
+                      title: { display: true, text: 'DNS Latency (ms)' }
+                    }
+                  }
+                }} />
+              </div>
             </div>
           </div>
         ) : loading ? (
           <div style={{ textAlign: 'center', padding: '3rem' }}>
-            Loading charts...
+            <div style={{
+              display: 'inline-block',
+              width: '40px',
+              height: '40px',
+              border: '4px solid #f3f4f6',
+              borderTop: '4px solid #3b82f6',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite'
+            }}></div>
+            <p style={{ marginTop: '1rem', color: '#6b7280' }}>Loading charts...</p>
           </div>
         ) : (
           <div style={{
@@ -311,6 +417,13 @@ const DeviceAnalytics = () => {
           </div>
         )}
       </div>
+      
+      <style jsx>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };
