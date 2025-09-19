@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: iot_monitoring
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d iot_monitoring"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://user:password@postgres:5432/iot_monitoring
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Single device simulator
+  simulator-1:
+    build: ./heartbeat-simulator
+    environment:
+      API_URL: http://backend:8000
+      DEVICE_SN: SRV001234567
+      DEVICE_NAME: Server Room Sensor
+      DEVICE_LOCATION: Data Center - Rack A1
+      BASE_CPU: "25"
+      BASE_RAM: "45"
+      BASE_TEMP: "42"
+      HEARTBEAT_INTERVAL: "60"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Second device simulator
+  simulator-2:
+    build: ./heartbeat-simulator
+    environment:
+      API_URL: http://backend:8000
+      DEVICE_SN: OFF987654321
+      DEVICE_NAME: Office Environment Monitor
+      DEVICE_LOCATION: Building B - Floor 3
+      BASE_CPU: "15"
+      BASE_RAM: "30"
+      BASE_TEMP: "38"
+      HEARTBEAT_INTERVAL: "60"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Third device simulator with higher load
+  simulator-3:
+    build: ./heartbeat-simulator
+    environment:
+      API_URL: http://backend:8000
+      DEVICE_SN: IOT555666777
+      DEVICE_NAME: IoT Gateway Device
+      DEVICE_LOCATION: Warehouse - Section C
+      BASE_CPU: "65"
+      BASE_RAM: "80"
+      BASE_TEMP: "70"
+      HEARTBEAT_INTERVAL: "60"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
